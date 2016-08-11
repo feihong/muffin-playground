@@ -1,0 +1,30 @@
+from wsclient import WsClient
+
+
+class MyClient(WsClient):
+    url = '/websocket/'
+    auto_dispatch = True
+
+    def on_open(self, evt):
+        print('Websocket opened')
+
+    def on_close(self, evt):
+        print('Websocket closed')
+
+    def on_progress(self, obj):
+        print(obj)
+        percent = obj['value'] / obj['total'] * 100
+        jq('progress').val(percent)
+        jq('.percent').text(str.format('{}%', percent.toFixed(0)))
+
+
+client = MyClient()
+
+jq = window.jQuery
+
+jq('button.start').on('click', def(evt):
+    client.send_text('start')
+)
+jq('button.stop').on('click', def(evt):
+    client.send_text('stop')
+)

@@ -1,0 +1,21 @@
+-inherit boilerplate.plim
+
+-block title
+  Web socket task
+
+-block extrahead
+  link rel='stylesheet' href='styles.styl'
+
+-block extrascript
+  script src='main.pyj'
+
+-block body
+  .container
+    h1 = title()
+
+    p Use a web socket handler to push multiple pieces of data to the client after initial page load.
+
+    .results
+      .result-row
+        -for result in results
+          .result = result

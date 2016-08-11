@@ -1,0 +1,24 @@
+-inherit boilerplate.plim
+
+-block title
+  Synchronous task
+
+-block extrahead
+  link rel='stylesheet' href='styles.styl'
+
+-block extrascript
+  script src='main.pyj'
+
+-block body
+  .container
+    h1 = title()
+
+    p Start, stop, and view progress of a long-running synchronous task.
+
+    p.buttons
+      button.btn.btn-default.start Start
+      button.btn.btn-default.stop Stop
+
+    .progress-container
+      .percent 0%
+      progress value=0 max=100

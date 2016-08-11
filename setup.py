@@ -10,9 +10,10 @@ if sys.argv[-1] == 'publish':
 
 setup(
     name='muffin-playground',
-    version='0.0.1',
+    version='0.0.2',
     license='Apache 2.0',
-    description=Path('README.rst').read_text(),
+    description='Convenience classes for simple muffin apps',
+    long_description=Path('README.rst').read_text(),
     platforms=('Any',),
     keywords='asyncio aiohttp muffin'.split(),
     author='Feihong Hsu',

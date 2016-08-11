@@ -1,0 +1,7 @@
+include LICENSE
+include MANIFEST.in
+graft muffin_playground
+graft examples
+global-exclude __pycache__
+global-exclude *.pyj-cached
+global-exclude .DS_Store

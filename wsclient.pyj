@@ -1,0 +1,44 @@
+@external
+class WebSocket:
+    pass
+
+
+class WsClient:
+    auto_dispatch = False
+    url = None
+
+    def __init__(self):
+        url = self.url
+        if str.startswith(url, '/'):
+            url = 'ws://' + document.location.host + url
+        ws = WebSocket(url)
+        ws.onopen = self.on_open.bind(self)
+        ws.onclose = self.on_close.bind(self)
+        ws.onmessage = self._on_message.bind(self)
+        self.ws = ws
+
+    def on_open(self, evt):
+        pass
+
+    def on_close(self, evt):
+        pass
+
+    def _on_message(self, evt):
+        obj = JSON.parse(evt.data)
+        if self.auto_dispatch:
+            method = getattr(self, 'on_' + obj['type'], None)
+            if method is None:
+                print(obj)
+            else:
+                method(obj)
+        else:
+            self.on_object(obj)
+
+    def send(self, obj):
+        self.ws.send(JSON.stringify(obj))
+
+    def send_text(self, text):
+        self.ws.send(text)
+
+    def on_object(self, obj):
+        raise NotImplementedError()

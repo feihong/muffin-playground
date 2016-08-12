@@ -11,7 +11,7 @@ if sys.argv[-1] == 'publish':
 
 setup(
     name='muffin-playground',
-    version='0.0.4',
+    version='0.0.5',
     license='Apache 2.0',
     description='Convenience classes for simple muffin apps',
     long_description=Path('README.rst').read_text(),

@@ -25,8 +25,10 @@ class WSHandler(WebSocketHandler):
     async def on_message(self, msg):
         print(msg)
         if msg.data == 'start' and not self.task:
-            self.task = self.execute_task(
-                long_task, ThreadSafeWebSocketWriter(self.websocket), self.stop_event)
+            self.task = app.start_task_in_executor(
+                long_task,
+                ThreadSafeWebSocketWriter(self.websocket),
+                self.stop_event)
             self.task.add_done_callback(self.done_callback)
         elif msg.data == 'stop' and self.task:
             self.stop_event.set()
@@ -35,11 +37,6 @@ class WSHandler(WebSocketHandler):
         print('done!')
         self.task = None
         self.stop_event.clear()
-
-    def execute_task(self, fn, *args):
-        loop = asyncio.get_event_loop()
-        coroutine = loop.run_in_executor(None, fn, *args)
-        return asyncio.ensure_future(coroutine)
 
 
 def long_task(writer, stop_event):

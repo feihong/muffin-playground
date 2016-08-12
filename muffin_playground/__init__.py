@@ -38,6 +38,11 @@ class Application(muffin.Application):
             tmpl_file = Path(tmpl_file)
         return render(tmpl_file, **kwargs)
 
+    def start_task_in_executor(self, fn, *args):
+        loop = asyncio.get_event_loop()
+        coroutine = loop.run_in_executor(None, fn, *args)
+        return asyncio.ensure_future(coroutine)
+
 
 class CustomStaticRoute(StaticRoute):
     @asyncio.coroutine

@@ -13,10 +13,14 @@ class MyClient(WsClient):
 
     def on_results(evt, obj):
         print(obj)
-        row = jq('<div class="result-row">').appendTo('.results')
-        for v in obj['value']:
-            jq('<div class="result">').text(v).appendTo(row)
-
+        sel = str.format('.results .result-row:eq({})', obj['page'])
+        row = jq(sel)
+        obj['value'].forEach(def(value, index):
+            sel = str.format('.result:eq({})', index)
+            result = row.find(sel)
+            result.removeClass('incomplete')
+            result.text(value)
+        )
 
 jq = window.jQuery
 client = MyClient()

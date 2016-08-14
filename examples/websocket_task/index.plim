@@ -19,3 +19,8 @@
       .result-row
         -for result in results
           .result = result
+
+      -for i in range(9):
+        .result-row
+          -for j in range(page_size):
+            .result.incomplete ?

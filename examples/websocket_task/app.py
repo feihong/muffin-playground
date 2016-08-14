@@ -16,8 +16,8 @@ PAGE_SIZE = 6
 
 @app.register('/')
 async def index(request):
-    results = await fetch(1)
-    return app.render('index.plim', results=results)
+    results = await fetch(0)
+    return app.render('index.plim', results=results, page_size=PAGE_SIZE)
 
 
 @app.register('/websocket/')
@@ -28,12 +28,12 @@ async def websocket(request):
 
     writer = WebSocketWriter(ws)
 
-    page = 2
+    page = 1
     while not ws.closed:
         results = await fetch(page)
         if results is None:
             break
-        writer.write(type='results', value=results)
+        writer.write(type='results', value=results, page=page)
         page += 1
 
     await ws.close()
@@ -46,9 +46,9 @@ app.register_static_resource()
 
 
 async def fetch(page):
-    if page >= 11:
+    if page >= 10:
         return None
-    start = (page - 1) * PAGE_SIZE + 1
+    start = page * PAGE_SIZE + 1
     end = start + PAGE_SIZE
     await asyncio.sleep(1)
     return [i for i in range(start, end)]

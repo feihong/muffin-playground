@@ -13,11 +13,10 @@ class MyClient(WsClient):
 
     def on_results(evt, obj):
         print(obj)
-        sel = str.format('.results .result-row:eq({})', obj['page'])
-        row = jq(sel)
+        row = jq('.results .result-row').get(obj['page'])
+        row = jq(row)
         obj['value'].forEach(def(value, index):
-            sel = str.format('.result:eq({})', index)
-            result = row.find(sel)
+            result = jq(row.find('.result').get(index))
             result.removeClass('incomplete')
             result.text(value)
         )

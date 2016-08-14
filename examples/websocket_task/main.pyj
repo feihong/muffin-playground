@@ -17,8 +17,10 @@ class MyClient(WsClient):
         row = jq(row)
         obj['value'].forEach(def(value, index):
             result = jq(row.find('.result').get(index))
-            result.removeClass('incomplete')
-            result.text(value)
+            result
+            .empty()
+            .removeClass('incomplete')
+            .text(value)
         )
 
 jq = window.jQuery

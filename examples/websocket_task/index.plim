@@ -23,4 +23,5 @@
       -for i in range(9):
         .result-row
           -for j in range(page_size):
-            .result.incomplete ?
+            .result.incomplete
+              span.glyphicon.glyphicon-repeat.spinning

@@ -127,7 +127,7 @@ class CustomStaticRoute(StaticRoute):
             '-j', '6',
             '-p', str(here),
         ]
-        output = subprocess.check_output(cmd)
+        output = await check_output(cmd)
         resp.content_length = len(output)
         resp.write(output)
         return resp
@@ -138,7 +138,7 @@ class CustomStaticRoute(StaticRoute):
         await resp.prepare(request)
 
         cmd =  ['stylus', '-p', str(stylus_file)]
-        output = subprocess.check_output(cmd)
+        output = await check_output(cmd)
         resp.content_length = len(output)
         resp.write(output)
         return resp
@@ -196,3 +196,10 @@ def render(tmpl_file, **kwargs):
         lookup=lookup,
         preprocessor=preprocessor)
     return tmpl.render(**kwargs)
+
+
+async def check_output(cmd):
+    proc = await asyncio.create_subprocess_exec(
+        *cmd, stdout=asyncio.subprocess.PIPE)
+    stdout, stderr = await proc.communicate()
+    return stdout

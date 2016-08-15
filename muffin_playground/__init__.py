@@ -6,6 +6,7 @@ from pathlib import Path
 
 import asyncio
 from aiohttp import hdrs
+from aiohttp.web import HTTPFound
 from aiohttp.web_exceptions import HTTPNotFound, HTTPNotModified
 import muffin
 from muffin.urls import StaticRoute, StaticResource
@@ -39,9 +40,7 @@ class Application(muffin.Application):
         return render(tmpl_file, **kwargs)
 
     def start_task_in_executor(self, fn, *args):
-        loop = asyncio.get_event_loop()
-        coroutine = loop.run_in_executor(None, fn, *args)
-        return asyncio.ensure_future(coroutine)
+        return start_task_in_executor(fn, *args)
 
 
 class CustomStaticRoute(StaticRoute):
@@ -73,7 +72,11 @@ class CustomStaticRoute(StaticRoute):
         if filepath.suffix == '.pyj':
             return (yield from self.compile_rapydscript(request, filepath))
 
-        # Handle RapydScript files.
+        # Handle Transcrypt files.
+        if filepath.suffix == '.py':
+            return (yield from self.compile_transcrypt(request, filepath, filename))
+
+        # Handle Stylus files.
         if filepath.suffix == '.styl':
             return (yield from self.compile_stylus(request, filepath))
 
@@ -143,6 +146,22 @@ class CustomStaticRoute(StaticRoute):
         resp.write(output)
         return resp
 
+    async def compile_transcrypt(self, request, py_file, filename):
+        import transcrypt.__main__ as ts
+
+        # import ipdb; ipdb.set_trace()
+        def compile():
+            sys.argv = ['transcrypt', '-b', '-m', str(py_file)]
+            print(sys.argv)
+            ts.main()
+
+        await start_task_in_executor(compile)
+
+        filename = Path(filename)
+        redirect_url = filename.parent / '__javascript__' / (filename.stem + '.js')
+        print(redirect_url)
+        return HTTPFound(str(redirect_url))
+
 
 class WebSocketWriter:
     def __init__(self, wsresponse):
@@ -196,6 +215,12 @@ def render(tmpl_file, **kwargs):
         lookup=lookup,
         preprocessor=preprocessor)
     return tmpl.render(**kwargs)
+
+
+def start_task_in_executor(fn, *args):
+    loop = asyncio.get_event_loop()
+    coroutine = loop.run_in_executor(None, fn, *args)
+    return asyncio.ensure_future(coroutine)
 
 
 async def check_output(cmd):

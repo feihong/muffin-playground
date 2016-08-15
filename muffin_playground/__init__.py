@@ -149,18 +149,30 @@ class CustomStaticRoute(StaticRoute):
     async def compile_transcrypt(self, request, py_file, filename):
         import transcrypt.__main__ as ts
 
-        # import ipdb; ipdb.set_trace()
+        output_file = py_file.parent / '__javascript__' / (py_file.stem + '.js')
+        if output_file.exists() and output_file.stat().st_mtime > py_file.stat().st_mtime:
+            return (await self.get_response_for_file(
+                request, output_file, 'text/javascript'))
+
+        filename = Path(filename)
+
         def compile():
             sys.argv = ['transcrypt', '-b', '-m', str(py_file)]
             print(sys.argv)
             ts.main()
 
         await start_task_in_executor(compile)
-
-        filename = Path(filename)
         redirect_url = filename.parent / '__javascript__' / (filename.stem + '.js')
-        print(redirect_url)
         return HTTPFound(str(redirect_url))
+
+    async def get_response_for_file(self, request, filepath, content_type):
+        resp = self._response_factory()
+        resp.content_type = content_type
+        await resp.prepare(request)
+        output = filepath.read_bytes()
+        resp.content_length = len(output)
+        resp.write(output)
+        return resp
 
 
 class WebSocketWriter:

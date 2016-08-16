@@ -157,7 +157,12 @@ class CustomStaticRoute(StaticRoute):
         filename = Path(filename)
 
         def compile():
-            sys.argv = ['transcrypt', '-b', '-m', str(py_file)]
+            sys.argv = [
+                'transcrypt',
+                '-b',           # build
+                '-m',           # generate source map
+                '-e', '6',      # generate ES 6 code
+                str(py_file)]
             print(sys.argv)
             ts.main()
 

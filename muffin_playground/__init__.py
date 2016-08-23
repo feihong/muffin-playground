@@ -15,6 +15,9 @@ from mako.lookup import TemplateLookup
 from plim import preprocessor
 
 
+__version__ = '0.0.6'
+
+
 here = Path(__file__).parent
 lookup = TemplateLookup(
     directories=['.', str(here)],
@@ -30,9 +33,8 @@ class Application(muffin.Application):
         super().__init__(*args, **kwargs)
 
     def register_static_resource(self):
-        route = CustomStaticRoute(None, '/', '.')
-        resource = StaticResource(route)
-        self.router._reg_resource(resource)
+        route = CustomStaticRoute(name=None, prefix='/', directory='.')
+        self.router.register_route(route)
 
     def render(self, tmpl_file, **kwargs):
         if not isinstance(tmpl_file, Path):
@@ -44,8 +46,7 @@ class Application(muffin.Application):
 
 
 class CustomStaticRoute(StaticRoute):
-    @asyncio.coroutine
-    def handle(self, request):
+    async def handle(self, request):
         filename = request.match_info['filename']
         try:
             filepath = self._directory.joinpath(filename).resolve()
@@ -55,129 +56,107 @@ class CustomStaticRoute(StaticRoute):
             raise HTTPNotFound() from error
         except Exception as error:
             # perm error or other kind!
-            request.logger.exception(error)
+            request.app.logger.exception(error)
             raise HTTPNotFound() from error
 
+        # Try to handle as a special file.
+        resp = await self.handle_special_file(request, filepath)
+        if resp is not None:
+            return resp
+
+        # Make sure that filepath is a file
+        if not filepath.is_file():
+            raise HTTPNotFound()
+
+        ret = await self._file_sender.send(request, filepath)
+        return ret
+
+    async def handle_special_file(self, request, filepath):
         # Handle .plim files.
         if filepath.is_dir():
-            filepath = filepath / 'index.plim'
-            if not filepath.exists():
+            filepath2 = filepath / 'index.plim'
+            if not filepath2.exists():
                 raise HTTPNotFound()
             else:
-                return (yield from self.render_plim(request, filepath))
+                return await self.render_plim(request, filepath2)
         if filepath.suffix == '.plim':
-            return (yield from self.render_plim(request, filepath))
+            return await self.render_plim(request, filepath)
 
         # Handle RapydScript files.
         if filepath.suffix == '.pyj':
-            return (yield from self.compile_rapydscript(request, filepath))
-
-        # Handle Transcrypt files.
-        if filepath.suffix == '.py':
-            return (yield from self.compile_transcrypt(request, filepath, filename))
+            return await self.render_rapydscript(request, filepath)
 
         # Handle Stylus files.
         if filepath.suffix == '.styl':
-            return (yield from self.compile_stylus(request, filepath))
+            return await self.render_stylus(request, filepath)
 
-        st = filepath.stat()
+        # # Handle Transcrypt files.
+        # if filepath.suffix == '.py':
+        #     return await self.compile_transcrypt(request, filepath, filename)
 
-        modsince = request.if_modified_since
-        if modsince is not None and st.st_mtime <= modsince.timestamp():
-            raise HTTPNotModified()
+        return None
 
-        ct, encoding = mimetypes.guess_type(str(filepath))
-        if not ct:
-            ct = 'application/octet-stream'
-
-        resp = self._response_factory()
-        resp.content_type = ct
-        if encoding:
-            resp.headers[hdrs.CONTENT_ENCODING] = encoding
-        resp.last_modified = st.st_mtime
-
-        file_size = st.st_size
-
-        resp.content_length = file_size
-        resp.set_tcp_cork(True)
-        try:
-            yield from resp.prepare(request)
-
-            with filepath.open('rb') as f:
-                yield from self._sendfile(request, resp, f, file_size)
-
-        finally:
-            resp.set_tcp_nodelay(True)
-
+    async def create_response(self, request, content_type, output):
+        resp = muffin.StreamResponse()
+        resp.content_type = content_type
+        await resp.prepare(request)
+        resp.content_length = len(output)
+        resp.write(output)
         return resp
 
     async def render_plim(self, request, tmpl_file):
-        resp = self._response_factory()
-        resp.content_type = 'text/html'
-        await resp.prepare(request)
-        output = render(tmpl_file).encode('utf-8')
-        resp.content_length = len(output)
-        resp.write(output)
-        return resp
+        return await self.create_response(
+            request,
+            content_type='text/html',
+            output=render(tmpl_file).encode('utf-8'))
 
-    async def compile_rapydscript(self, request, pyj_file):
-        resp = self._response_factory()
-        resp.content_type = 'text/javascript'
-        await resp.prepare(request)
-
+    async def render_rapydscript(self, request, pyj_file):
         cmd =  [
             'rapydscript', str(pyj_file),
-            '-j', '6',
-            '-p', str(here),
+            '--js-version', '6',
+            '--import-path', str(here),
         ]
-        output = await check_output(cmd)
-        resp.content_length = len(output)
-        resp.write(output)
-        return resp
+        return await self.create_response(
+            request,
+            content_type='text/javascript',
+            output=await check_output(cmd))
 
-    async def compile_stylus(self, request, stylus_file):
-        resp = self._response_factory()
-        resp.content_type = 'text/css'
-        await resp.prepare(request)
+    async def render_stylus(self, request, stylus_file):
+        cmd = ['stylus', '-p', str(stylus_file)]
+        return await self.create_response(
+            request,
+            content_type='text/css',
+            output=await check_output(cmd))
 
-        cmd =  ['stylus', '-p', str(stylus_file)]
-        output = await check_output(cmd)
-        resp.content_length = len(output)
-        resp.write(output)
-        return resp
-
-    async def compile_transcrypt(self, request, py_file, filename):
-        import transcrypt.__main__ as ts
-
-        output_file = py_file.parent / '__javascript__' / (py_file.stem + '.js')
-        if output_file.exists() and output_file.stat().st_mtime > py_file.stat().st_mtime:
-            return (await self.get_response_for_file(
-                request, output_file, 'text/javascript'))
-
-        filename = Path(filename)
-
-        def compile():
-            sys.argv = [
-                'transcrypt',
-                '-b',           # build
-                '-m',           # generate source map
-                '-e', '6',      # generate ES 6 code
-                str(py_file)]
-            print(sys.argv)
-            ts.main()
-
-        await start_task_in_executor(compile)
-        redirect_url = filename.parent / '__javascript__' / (filename.stem + '.js')
-        return HTTPFound(str(redirect_url))
-
-    async def get_response_for_file(self, request, filepath, content_type):
-        resp = self._response_factory()
-        resp.content_type = content_type
-        await resp.prepare(request)
-        output = filepath.read_bytes()
-        resp.content_length = len(output)
-        resp.write(output)
-        return resp
+    # async def compile_transcrypt(self, request, py_file, filename):
+    #     import transcrypt.__main__ as ts
+    #
+    #     redirect_url = filename.parent / '__javascript__' / (filename.stem + '.js')
+    #     output_file = py_file.parent / '__javascript__' / (py_file.stem + '.js')
+    #     if output_file.exists() and output_file.stat().st_mtime > py_file.stat().st_mtime:
+    #         return HTTPFound(str(redirect_url))
+    #
+    #     filename = Path(filename)
+    #
+    #     def compile():
+    #         sys.argv = [
+    #             'transcrypt',
+    #             '-b',           # build
+    #             '-m',           # generate source map
+    #             '-e', '6',      # generate ES 6 code
+    #             str(py_file)]
+    #         print(sys.argv)
+    #         ts.main()
+    #
+    #     await start_task_in_executor(compile)
+    #     return HTTPFound(str(redirect_url))
+    #
+    # async def get_response_for_file(self, request, filepath, content_type):
+    #     resp = await self.get_response(request, content_type)
+    #     output = filepath.read_bytes()
+    #     resp.content_length = len(output)
+    #     resp.write(output)
+    #     return resp
 
 
 class WebSocketWriter:
@@ -241,7 +220,9 @@ def start_task_in_executor(fn, *args):
 
 
 async def check_output(cmd):
+    "Like the asynchronous version of subprocess.check_output()."
     proc = await asyncio.create_subprocess_exec(
-        *cmd, stdout=asyncio.subprocess.PIPE)
+        *cmd,
+        stdout=asyncio.subprocess.PIPE)
     stdout, stderr = await proc.communicate()
     return stdout

@@ -15,7 +15,7 @@ from mako.lookup import TemplateLookup
 from plim import preprocessor
 
 
-__version__ = '0.0.6'
+__version__ = '0.0.7'
 
 
 here = Path(__file__).parent
@@ -30,10 +30,18 @@ class Application(muffin.Application):
             kwargs['DEBUG'] = True
         if 'name' not in kwargs:
             kwargs['name'] = 'playground'
+
+        client_autoreload = kwargs.get('client_autoreload', True)
         super().__init__(*args, **kwargs)
 
+        if client_autoreload:
+            self.reload_sockets = set()
+            self.router.add_route('GET', '/__reload.js', reload_js)
+            self.router.add_route('GET', '/__reload__/', self._reload_websocket)
+
     def register_static_route(self, prefix='/', directory='.'):
-        route = CustomStaticRoute(name=None, prefix=prefix, directory=directory)
+        route = SpecialFileStaticRoute(
+            name=None, prefix=prefix, directory=directory, client_autoreload=True)
         self.router.register_route(route)
 
     def render(self, tmpl_file, **kwargs):
@@ -44,8 +52,21 @@ class Application(muffin.Application):
     def start_task_in_executor(self, fn, *args):
         return start_task_in_executor(fn, *args)
 
+    async def _reload_websocket(self, request):
+        ws = muffin.WebSocketResponse()
+        await ws.prepare(request)
+        self.reload_sockets.add(ws)
+        async for msg in ws:
+            pass
+        self.reload_sockets.remove(ws)
+        return ws
 
-class CustomStaticRoute(StaticRoute):
+
+class SpecialFileStaticRoute(StaticRoute):
+    def __init__(self, *args, **kwargs):
+        self.client_autoreload = kwargs.pop('client_autoreload', True)
+        super().__init__(*args, **kwargs)
+
     async def handle(self, request):
         filename = request.match_info['filename']
         try:
@@ -78,85 +99,41 @@ class CustomStaticRoute(StaticRoute):
             if not filepath2.exists():
                 raise HTTPNotFound()
             else:
-                return await self.render_plim(request, filepath2)
+                return await self.render_plim(filepath2)
         if filepath.suffix == '.plim':
-            return await self.render_plim(request, filepath)
+            return await self.render_plim(filepath)
 
         # Handle RapydScript files.
         if filepath.suffix == '.pyj':
-            return await self.render_rapydscript(request, filepath)
+            return await self.render_rapydscript(filepath)
 
         # Handle Stylus files.
         if filepath.suffix == '.styl':
-            return await self.render_stylus(request, filepath)
-
-        # # Handle Transcrypt files.
-        # if filepath.suffix == '.py':
-        #     return await self.compile_transcrypt(request, filepath, filename)
+            return await self.render_stylus(filepath)
 
         return None
 
-    async def create_response(self, request, content_type, output):
-        resp = muffin.StreamResponse()
-        resp.content_type = content_type
-        await resp.prepare(request)
-        resp.content_length = len(output)
-        resp.write(output)
-        return resp
+    async def render_plim(self, tmpl_file):
+        html = render(tmpl_file)
+        if self.client_autoreload:
+            html = html.replace('</body>', '<script src="/__reload.js"></script></body>')
+        return muffin.Response(content_type='text/html', text=html)
 
-    async def render_plim(self, request, tmpl_file):
-        return await self.create_response(
-            request,
-            content_type='text/html',
-            output=render(tmpl_file).encode('utf-8'))
-
-    async def render_rapydscript(self, request, pyj_file):
+    async def render_rapydscript(self, pyj_file):
         cmd =  [
             'rapydscript', str(pyj_file),
             '--js-version', '6',
             '--import-path', str(here),
         ]
-        return await self.create_response(
-            request,
+        return muffin.Response(
             content_type='text/javascript',
-            output=await check_output(cmd))
+            body=await check_output(cmd))
 
-    async def render_stylus(self, request, stylus_file):
+    async def render_stylus(self, stylus_file):
         cmd = ['stylus', '-p', str(stylus_file)]
-        return await self.create_response(
-            request,
+        return muffin.Response(
             content_type='text/css',
-            output=await check_output(cmd))
-
-    # async def compile_transcrypt(self, request, py_file, filename):
-    #     import transcrypt.__main__ as ts
-    #
-    #     redirect_url = filename.parent / '__javascript__' / (filename.stem + '.js')
-    #     output_file = py_file.parent / '__javascript__' / (py_file.stem + '.js')
-    #     if output_file.exists() and output_file.stat().st_mtime > py_file.stat().st_mtime:
-    #         return HTTPFound(str(redirect_url))
-    #
-    #     filename = Path(filename)
-    #
-    #     def compile():
-    #         sys.argv = [
-    #             'transcrypt',
-    #             '-b',           # build
-    #             '-m',           # generate source map
-    #             '-e', '6',      # generate ES 6 code
-    #             str(py_file)]
-    #         print(sys.argv)
-    #         ts.main()
-    #
-    #     await start_task_in_executor(compile)
-    #     return HTTPFound(str(redirect_url))
-    #
-    # async def get_response_for_file(self, request, filepath, content_type):
-    #     resp = await self.get_response(request, content_type)
-    #     output = filepath.read_bytes()
-    #     resp.content_length = len(output)
-    #     resp.write(output)
-    #     return resp
+            body=await check_output(cmd))
 
 
 class WebSocketWriter:
@@ -220,9 +197,15 @@ def start_task_in_executor(fn, *args):
 
 
 async def check_output(cmd):
-    "Like the asynchronous version of subprocess.check_output()."
+    "Basically the asynchronous version of subprocess.check_output()."
     proc = await asyncio.create_subprocess_exec(
         *cmd,
         stdout=asyncio.subprocess.PIPE)
     stdout, stderr = await proc.communicate()
     return stdout
+
+
+async def reload_js(request):
+    return muffin.Response(
+        content_type='text/javascript',
+        body=(here / 'reload.js').read_bytes())

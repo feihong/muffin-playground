@@ -27,7 +27,11 @@ setup(
     url='https://github.com/feihong/muffin-playground',
     packages=find_packages(),
     include_package_data=True,
-    install_requires=['muffin>=0.9.0', 'plim'],
+    install_requires=[
+        'muffin>=0.9.0',
+        'plim',
+        'watchdog',
+    ],
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Developers',

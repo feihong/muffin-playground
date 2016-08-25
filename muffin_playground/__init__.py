@@ -14,6 +14,8 @@ from mako.template import Template
 from mako.lookup import TemplateLookup
 from plim import preprocessor
 
+from . import watcher
+
 
 __version__ = '0.0.7'
 
@@ -31,13 +33,25 @@ class Application(muffin.Application):
         if 'name' not in kwargs:
             kwargs['name'] = 'playground'
 
-        client_autoreload = kwargs.get('client_autoreload', True)
+        self.client_autoreload = kwargs.pop('client_autoreload', True)
         super().__init__(*args, **kwargs)
 
-        if client_autoreload:
+        if self.client_autoreload:
             self.reload_sockets = set()
             self.router.add_route('GET', '/__reload.js', reload_js)
             self.router.add_route('GET', '/__reload__/', self._reload_websocket)
+
+    def make_handler(self, **kwargs):
+        # In latest version of aiohttp, you can use on_startup signal instead.
+        if self.client_autoreload:
+            self.watcher = watcher.Watcher(
+                dir='.',
+                loop=self.loop,
+                sockets=self.reload_sockets)
+            self.watcher.start()
+            self.on_shutdown.append(lambda app: self.watcher.stop())
+
+        return super().make_handler(**kwargs)
 
     def register_static_route(self, prefix='/', directory='.'):
         route = SpecialFileStaticRoute(

@@ -11,7 +11,7 @@ from muffin_playground import Application, WebSocketHandler, WebSocketWriter
 
 
 app = Application()
-app.register_static_resource()
+app.register_static_route()
 
 
 @app.register('/websocket/')

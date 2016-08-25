@@ -42,7 +42,7 @@ async def websocket(request):
     return ws
 
 
-app.register_static_resource()
+app.register_static_route()
 
 
 async def fetch(page):

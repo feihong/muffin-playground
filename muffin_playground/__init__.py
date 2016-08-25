@@ -32,8 +32,8 @@ class Application(muffin.Application):
             kwargs['name'] = 'playground'
         super().__init__(*args, **kwargs)
 
-    def register_static_resource(self):
-        route = CustomStaticRoute(name=None, prefix='/', directory='.')
+    def register_static_route(self, prefix='/', directory='.'):
+        route = CustomStaticRoute(name=None, prefix=prefix, directory=directory)
         self.router.register_route(route)
 
     def render(self, tmpl_file, **kwargs):

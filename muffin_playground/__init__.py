@@ -52,6 +52,7 @@ class Application(muffin.Application):
                 self.watcher.start()
                 # Don't use .register_on_finish(), which is deprecated.
                 self.on_shutdown.append(lambda app: self.watcher.stop())
+
             self.register_on_start(start_callback)
 
     def register_special_static_route(self, prefix='/', directory='.'):
@@ -61,6 +62,8 @@ class Application(muffin.Application):
             route = SpecialFileStaticRoute(
                 name=None, prefix=prefix, directory=directory, client_autoreload=True)
             self.router.register_route(route)
+            self.router.add_static('/boilerplate/', str(resources))
+
         self.register_on_start(start_callback)
 
     def render(self, tmpl_file, **kwargs):
@@ -87,6 +90,12 @@ class SpecialFileStaticRoute(StaticRoute):
         super().__init__(*args, **kwargs)
 
     async def handle(self, request):
+        """
+        Based on the code in:
+
+        https://github.com/KeepSafe/aiohttp/blob/v0.22.5/aiohttp/web_urldispatcher.py
+
+        """
         filename = request.match_info['filename']
         try:
             filepath = self._directory.joinpath(filename).resolve()

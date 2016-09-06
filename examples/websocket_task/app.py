@@ -15,6 +15,7 @@ app = Application()
 app.register_special_static_route()
 PAGE_SIZE = 6
 
+
 @app.register('/')
 async def index(request):
     results = await fetch(0)

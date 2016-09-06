@@ -7,7 +7,7 @@ html lang='en'
     title
       -block title
     -block style
-      link rel='stylesheet' href='/boilerplate/bootstrap-3.3.7.min.css'
+      link rel='stylesheet' href='/boilerplate/css/bootstrap-3.3.7.min.css'
     -block extrahead
 
   -def name='body_class()' filter='trim'
@@ -18,5 +18,5 @@ html lang='en'
 
     -block script
       script src='/boilerplate/jquery-3.1.0.min.js'
-      script src='/boilerplate/bootstrap-3.3.7.min.js'
+      script src='/boilerplate/js/bootstrap-3.3.7.min.js'
     -block extrascript

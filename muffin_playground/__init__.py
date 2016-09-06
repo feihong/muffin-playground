@@ -17,7 +17,7 @@ from plim import preprocessor
 from . import watcher
 
 
-__version__ = '0.0.8'
+__version__ = '0.0.9'
 
 
 resources = Path(__file__).parent / 'resources'

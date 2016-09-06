@@ -16,12 +16,8 @@ What it offers:
 Installation
 ============
 
-```
-pip install muffin-playground
-```
+  pip install muffin-playground
 
 If you want RapydScript and Stylus support, you must install their packages via npm:
 
-```
-npm install -g stylus rapydscript-ng
-```
+  npm install -g stylus rapydscript-ng

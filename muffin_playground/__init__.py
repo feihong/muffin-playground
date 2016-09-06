@@ -54,10 +54,14 @@ class Application(muffin.Application):
                 self.on_shutdown.append(lambda app: self.watcher.stop())
             self.register_on_start(start_callback)
 
-    def register_static_route(self, prefix='/', directory='.'):
-        route = SpecialFileStaticRoute(
-            name=None, prefix=prefix, directory=directory, client_autoreload=True)
-        self.router.register_route(route)
+    def register_special_static_route(self, prefix='/', directory='.'):
+        # Use a start callback because a static route usually needs to be
+        # towards the end of the list of routes.
+        def start_callback(app):
+            route = SpecialFileStaticRoute(
+                name=None, prefix=prefix, directory=directory, client_autoreload=True)
+            self.router.register_route(route)
+        self.register_on_start(start_callback)
 
     def render(self, tmpl_file, **kwargs):
         if not isinstance(tmpl_file, Path):

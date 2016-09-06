@@ -13,7 +13,7 @@ from muffin_playground import Application, WebSocketHandler, ThreadSafeWebSocket
 
 
 app = Application()
-app.register_static_route()
+app.register_special_static_route()
 
 
 @app.register('/websocket/')

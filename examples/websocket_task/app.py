@@ -12,6 +12,7 @@ from muffin_playground import Application, WebSocketWriter
 
 
 app = Application()
+app.register_special_static_route()
 PAGE_SIZE = 6
 
 @app.register('/')
@@ -40,9 +41,6 @@ async def websocket(request):
     print('Websocket closed')
 
     return ws
-
-
-app.register_static_route()
 
 
 async def fetch(page):

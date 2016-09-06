@@ -17,12 +17,12 @@ from plim import preprocessor
 from . import watcher
 
 
-__version__ = '0.0.7'
+__version__ = '0.0.8'
 
 
-here = Path(__file__).parent
+resources = Path(__file__).parent / 'resources'
 lookup = TemplateLookup(
-    directories=['.', str(here)],
+    directories=['.', str(resources)],
     preprocessor=preprocessor)
 
 
@@ -41,17 +41,18 @@ class Application(muffin.Application):
             self.router.add_route('GET', '/__reload.js', reload_js)
             self.router.add_route('GET', '/__reload__/', self._reload_websocket)
 
-    def make_handler(self, **kwargs):
-        # In latest version of aiohttp, you can use on_startup signal instead.
-        if self.client_autoreload:
-            self.watcher = watcher.Watcher(
-                dir='.',
-                loop=self.loop,
-                sockets=self.reload_sockets)
-            self.watcher.start()
-            self.on_shutdown.append(lambda app: self.watcher.stop())
-
-        return super().make_handler(**kwargs)
+            # You must use a start callback, because at this point self.loop
+            # does not yet have a valid value.
+            # In latest version of aiohttp, you can use on_startup signal instead.
+            def start_callback(app):
+                self.watcher = watcher.Watcher(
+                    dir='.',
+                    loop=self.loop,
+                    sockets=self.reload_sockets)
+                self.watcher.start()
+                # Don't use .register_on_finish(), which is deprecated.
+                self.on_shutdown.append(lambda app: self.watcher.stop())
+            self.register_on_start(start_callback)
 
     def register_static_route(self, prefix='/', directory='.'):
         route = SpecialFileStaticRoute(
@@ -137,7 +138,7 @@ class SpecialFileStaticRoute(StaticRoute):
         cmd =  [
             'rapydscript', str(pyj_file),
             '--js-version', '6',
-            '--import-path', str(here),
+            '--import-path', str(resources),
         ]
         return muffin.Response(
             content_type='text/javascript',
@@ -222,4 +223,4 @@ async def check_output(cmd):
 async def reload_js(request):
     return muffin.Response(
         content_type='text/javascript',
-        body=(here / 'reload.js').read_bytes())
+        body=(resources / 'reload.js').read_bytes())

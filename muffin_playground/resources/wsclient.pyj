@@ -42,3 +42,6 @@ class WsClient:
 
     def on_object(self, obj):
         raise NotImplementedError()
+
+    def close(self):
+        self.ws.close()

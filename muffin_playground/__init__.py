@@ -17,7 +17,7 @@ from plim import preprocessor
 from . import watcher
 
 
-__version__ = '0.0.9'
+__version__ = '0.0.10'
 
 
 resources = Path(__file__).parent / 'resources'
@@ -219,9 +219,9 @@ def render(tmpl_file, **kwargs):
 
 
 def start_task_in_executor(fn, *args):
+    "Execute the given function using the default ThreadPoolExecutor."
     loop = asyncio.get_event_loop()
-    coroutine = loop.run_in_executor(None, fn, *args)
-    return asyncio.ensure_future(coroutine)
+    return loop.run_in_executor(None, fn, *args)
 
 
 async def check_output(cmd):

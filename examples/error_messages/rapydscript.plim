@@ -1,0 +1,11 @@
+-inherit boilerplate.plim
+
+-block title
+  RapydScript error
+
+-block extrascript
+  script src='main.pyj'
+
+-block body
+  .container
+    h1 = title()

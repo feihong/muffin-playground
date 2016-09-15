@@ -1,0 +1,11 @@
+-inherit boilerplate.plim
+
+-block title
+  Stylus error
+
+-block extrahead
+  link rel='stylesheet' href='/styles.styl'
+
+-block body
+  .container
+    h1 = title()

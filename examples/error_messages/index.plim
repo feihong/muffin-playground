@@ -7,10 +7,10 @@
   .container
     h1 = title()
 
-    p Show how error messages from RapydScript (.pyj) and Stylus (.styl) files take over the page.
+    p Show how error messages from RapydScript and Stylus files take over the page.
 
     p
-      a href='/rapydscript/' RapydScript
+      a href='/rapydscript.plim' RapydScript (.pyj)
 
     p
-      a href='/stylus/' Stylus
+      a href='/stylus.plim' Stylus (.styl)

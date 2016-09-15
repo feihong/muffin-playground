@@ -1,0 +1,16 @@
+-inherit boilerplate.plim
+
+-block title
+  Rendering error messages
+
+-block body
+  .container
+    h1 = title()
+
+    p Show how error messages from RapydScript (.pyj) and Stylus (.styl) files take over the page.
+
+    p
+      a href='/rapydscript/' RapydScript
+
+    p
+      a href='/stylus/' Stylus

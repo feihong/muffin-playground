@@ -20,6 +20,16 @@ from . import watcher
 __version__ = '0.0.10'
 
 
+ERROR_JAVASCRIPT = """
+document.body.onload = function() {
+    document.body.innerHTML = '';
+    var pre = document.createElement('pre');
+    pre.innerText = %s;
+    document.body.appendChild(pre);
+}
+"""
+
+
 resources = Path(__file__).parent / 'resources'
 lookup = TemplateLookup(
     directories=['.', str(resources)],
@@ -153,15 +163,21 @@ class SpecialFileStaticRoute(StaticRoute):
             '--js-version', '6',
             '--import-path', str(resources),
         ]
+        success, output = await check_output(cmd)
+        if not success:
+            output = ERROR_JAVASCRIPT % json.dumps(output)
         return muffin.Response(
             content_type='text/javascript',
-            body=await check_output(cmd))
+            body=output)
 
     async def render_stylus(self, stylus_file):
         cmd = ['stylus', '-p', str(stylus_file)]
+        success, output = await check_output(cmd)
+        if not success:
+            output = ERROR_JAVASCRIPT % json.dumps(output)
         return muffin.Response(
-            content_type='text/css',
-            body=await check_output(cmd))
+            content_type='text/javascript',
+            body=output)
 
 
 class WebSocketWriter:
@@ -228,9 +244,13 @@ async def check_output(cmd):
     "Basically the asynchronous version of subprocess.check_output()."
     proc = await asyncio.create_subprocess_exec(
         *cmd,
-        stdout=asyncio.subprocess.PIPE)
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE)
     stdout, stderr = await proc.communicate()
-    return stdout
+    if proc.code == 0:
+        return False, stderr
+    else:
+        return True, stdout
 
 
 async def reload_js(request):

@@ -163,21 +163,21 @@ class SpecialFileStaticRoute(StaticRoute):
             '--js-version', '6',
             '--import-path', str(resources),
         ]
-        success, output = await check_output(cmd)
-        if not success:
-            output = ERROR_JAVASCRIPT % json.dumps(output)
-        return muffin.Response(
-            content_type='text/javascript',
-            body=output)
+        code, stdout, stderr = await check_output(cmd)
+        if code == 0:
+            output = stdout
+        else:
+            output = get_error_javascript(stderr)
+        return muffin.Response(content_type='text/javascript', body=output)
 
     async def render_stylus(self, stylus_file):
         cmd = ['stylus', '-p', str(stylus_file)]
-        success, output = await check_output(cmd)
-        if not success:
-            output = ERROR_JAVASCRIPT % json.dumps(output)
-        return muffin.Response(
-            content_type='text/javascript',
-            body=output)
+        code, stdout, stderr = await check_output(cmd)
+        if code == 0:
+            output = stdout
+        else:
+            output = get_error_javascript(stderr)
+        return muffin.Response(content_type='text/css', body=output)
 
 
 class WebSocketWriter:
@@ -247,13 +247,15 @@ async def check_output(cmd):
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE)
     stdout, stderr = await proc.communicate()
-    if proc.code == 0:
-        return False, stderr
-    else:
-        return True, stdout
+    return proc.returncode, stdout, stderr
 
 
 async def reload_js(request):
     return muffin.Response(
         content_type='text/javascript',
         body=(resources / 'reload.js').read_bytes())
+
+
+def get_error_javascript(stderr):
+    result = ERROR_JAVASCRIPT % json.dumps(stderr.decode('utf-8'))
+    return result.encode('utf-8')

@@ -68,8 +68,16 @@ class Application(muffin.Application):
         # Use a start callback because a static route usually needs to be
         # towards the end of the list of routes.
         def start_callback(app):
+            err_fn = (
+                self._write_debug_sockets
+                if self.client_debug
+                else lambda x: None)
             route = SpecialFileStaticRoute(
-                name=None, prefix=prefix, directory=directory, client_debug=True)
+                name=None,
+                prefix=prefix,
+                directory=directory,
+                client_debug=self.client_debug,
+                error_reporting_func=err_fn)
             self.router.register_route(route)
             self.router.add_static('/boilerplate/', str(resources))
 
@@ -93,6 +101,8 @@ class Application(muffin.Application):
         return ws
 
     def _write_debug_sockets(self, data):
+        if isinstance(data, bytes):
+            data = data.decode('utf-8')
         for ws in self.debug_sockets:
             ws.send_str(data)
 
@@ -100,6 +110,7 @@ class Application(muffin.Application):
 class SpecialFileStaticRoute(StaticRoute):
     def __init__(self, *args, **kwargs):
         self.client_debug = kwargs.pop('client_debug', True)
+        self._report_error = kwargs.pop('error_reporting_func', None)
         super().__init__(*args, **kwargs)
 
     async def handle(self, request):
@@ -157,7 +168,7 @@ class SpecialFileStaticRoute(StaticRoute):
     async def render_plim(self, tmpl_file):
         html = render(tmpl_file)
         if self.client_debug:
-            html = html.replace('</body>', '<script src="/__debug.js"></script></body>')
+            html = html.replace('<head>', '<head><script src="/__debug.js"></script>')
         return muffin.Response(content_type='text/html', text=html)
 
     async def render_rapydscript(self, pyj_file):
@@ -170,7 +181,8 @@ class SpecialFileStaticRoute(StaticRoute):
         if code == 0:
             output = stdout
         else:
-            output = get_error_javascript(stderr)
+            output = b'/*\n\n' + stderr + b'\n\n*/'
+            self._report_error(stderr)
         return muffin.Response(content_type='text/javascript', body=output)
 
     async def render_stylus(self, stylus_file):
@@ -179,7 +191,8 @@ class SpecialFileStaticRoute(StaticRoute):
         if code == 0:
             output = stdout
         else:
-            output = get_error_javascript(stderr)
+            output = b'/*\n\n' + stderr + b'\n\n*/'
+            self._report_error(stderr)
         return muffin.Response(content_type='text/css', body=output)
 
 

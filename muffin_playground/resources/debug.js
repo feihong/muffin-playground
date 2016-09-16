@@ -8,6 +8,7 @@
     } else {
       document.body.innerHTML = ''
       var div = document.createElement('div')
+      div.style = 'font-family: monospace'
       div.innerText = evt.data
       document.body.appendChild(div)
     }

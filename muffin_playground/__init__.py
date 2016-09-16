@@ -43,13 +43,13 @@ class Application(muffin.Application):
         if 'name' not in kwargs:
             kwargs['name'] = 'playground'
 
-        self.client_autoreload = kwargs.pop('client_autoreload', True)
+        self.client_debug = kwargs.pop('client_debug', True)
         super().__init__(*args, **kwargs)
 
-        if self.client_autoreload:
-            self.reload_sockets = set()
-            self.router.add_route('GET', '/__reload.js', reload_js)
-            self.router.add_route('GET', '/__reload__/', self._reload_websocket)
+        if self.client_debug:
+            self.debug_sockets = set()
+            self.router.add_route('GET', '/__debug.js', debug_js)
+            self.router.add_route('GET', '/__debug__/', self._debug_websocket)
 
             # You must use a start callback, because at this point self.loop
             # does not yet have a valid value.
@@ -57,8 +57,7 @@ class Application(muffin.Application):
             def start_callback(app):
                 self.watcher = watcher.Watcher(
                     dir='.',
-                    loop=self.loop,
-                    sockets=self.reload_sockets)
+                    app=self)
                 self.watcher.start()
                 # Don't use .register_on_finish(), which is deprecated.
                 self.on_shutdown.append(lambda app: self.watcher.stop())
@@ -70,7 +69,7 @@ class Application(muffin.Application):
         # towards the end of the list of routes.
         def start_callback(app):
             route = SpecialFileStaticRoute(
-                name=None, prefix=prefix, directory=directory, client_autoreload=True)
+                name=None, prefix=prefix, directory=directory, client_debug=True)
             self.router.register_route(route)
             self.router.add_static('/boilerplate/', str(resources))
 
@@ -84,19 +83,23 @@ class Application(muffin.Application):
     def start_task_in_executor(self, fn, *args):
         return start_task_in_executor(fn, *args)
 
-    async def _reload_websocket(self, request):
+    async def _debug_websocket(self, request):
         ws = muffin.WebSocketResponse()
         await ws.prepare(request)
-        self.reload_sockets.add(ws)
+        self.debug_sockets.add(ws)
         async for msg in ws:
             pass
-        self.reload_sockets.remove(ws)
+        self.debug_sockets.remove(ws)
         return ws
+
+    def _write_debug_sockets(self, data):
+        for ws in self.debug_sockets:
+            ws.send_str(data)
 
 
 class SpecialFileStaticRoute(StaticRoute):
     def __init__(self, *args, **kwargs):
-        self.client_autoreload = kwargs.pop('client_autoreload', True)
+        self.client_debug = kwargs.pop('client_debug', True)
         super().__init__(*args, **kwargs)
 
     async def handle(self, request):
@@ -153,8 +156,8 @@ class SpecialFileStaticRoute(StaticRoute):
 
     async def render_plim(self, tmpl_file):
         html = render(tmpl_file)
-        if self.client_autoreload:
-            html = html.replace('</body>', '<script src="/__reload.js"></script></body>')
+        if self.client_debug:
+            html = html.replace('</body>', '<script src="/__debug.js"></script></body>')
         return muffin.Response(content_type='text/html', text=html)
 
     async def render_rapydscript(self, pyj_file):
@@ -250,10 +253,10 @@ async def check_output(cmd):
     return proc.returncode, stdout, stderr
 
 
-async def reload_js(request):
+async def debug_js(request):
     return muffin.Response(
         content_type='text/javascript',
-        body=(resources / 'reload.js').read_bytes())
+        body=(resources / 'debug.js').read_bytes())
 
 
 def get_error_javascript(stderr):

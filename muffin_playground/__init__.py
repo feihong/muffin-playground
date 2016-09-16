@@ -20,16 +20,6 @@ from . import watcher
 __version__ = '0.0.11'
 
 
-ERROR_JAVASCRIPT = """
-document.body.onload = function() {
-    document.body.innerHTML = '';
-    var pre = document.createElement('pre');
-    pre.innerText = %s;
-    document.body.appendChild(pre);
-}
-"""
-
-
 resources = Path(__file__).parent / 'resources'
 lookup = TemplateLookup(
     directories=['.', str(resources)],
@@ -270,8 +260,3 @@ async def debug_js(request):
     return muffin.Response(
         content_type='text/javascript',
         body=(resources / 'debug.js').read_bytes())
-
-
-def get_error_javascript(stderr):
-    result = ERROR_JAVASCRIPT % json.dumps(stderr.decode('utf-8'))
-    return result.encode('utf-8')

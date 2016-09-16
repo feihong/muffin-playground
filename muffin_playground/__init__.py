@@ -17,7 +17,7 @@ from plim import preprocessor
 from . import watcher
 
 
-__version__ = '0.0.10'
+__version__ = '0.0.11'
 
 
 ERROR_JAVASCRIPT = """
